@@ -4,29 +4,30 @@ from snowflake.snowpark.context import get_active_session
 from snowflake.snowpark.functions import col
 
 # Write directly to the app
-st.title("Pending smoothie orders :cup_with_straw:")
+st.title("Customize your smoothie :cup_with_straw:")
 st.write(
-    """Orders that need to be filled.""")
+    """Choose fruits""")
 
-session = get_active_session()
-my_dataframe = session.table("smoothies.public.orders").filter(col("ORDER_FILLED")==0).collect()
+name_on_order = st.text_input('name on smoothie')
+st.write('the name will be: ', name_on_order)
 
-if my_dataframe:
-    editable_df = st.data_editor(my_dataframe)
-    submited = st.button("submit")
+session=get_active_session()
+my_dataframe = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME'))
+
+ingredients_list = st.multiselect('chose 5: ', my_dataframe)
+
+if ingredients_list:
+    ingredients_string = ''
+
+    for fruit_chosen in ingredients_list:
+        ingredients_string += fruit_chosen + ' '
+
+    st.write(ingredients_string)
+
+    my_insert_stmt = """ insert into smoothies.public.orders(ingredients)
+            values ('""" + ingredients_string + """')"""
+    time_to_insert = st.button('submit')
     
-    if submited:
-        st.success("someone clicked")
-    
-        og_dataset = session.table("smoothies.public.orders")
-        edited_dataset = session.create_dataframe(editable_df)
-        try:
-            og_dataset.merge(edited_dataset
-                             , (og_dataset['order_uid'] == edited_dataset['order_uid'])
-                             , [when_matched().update({'ORDER_FILLED': edited_dataset['ORDER_FILLED']})]
-                            )
-            st.success("orders updated yaay")
-        except:
-            st.write("something bad")
-    else:
-        st.write("no more pendings")
+    if time_to_insert:
+        session.sql(my_insert_stmt).collect()
+        st.success('Your Smoothie is ordered! ' + name_on_order, icon="✅")
